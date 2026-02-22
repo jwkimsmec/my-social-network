@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const db = require('./database');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
+const path = require('path'); // Added for handling file paths
 
 const app = express();
 const server = http.createServer(app);
@@ -14,13 +15,20 @@ const io = new Server(server, { cors: { origin: "*" } });
 app.use(cors());
 app.use(express.json());
 
+// --- NEW: SERVE FRONTEND FILES ---
+// This tells Express to serve index.html and other files from your folder
+app.use(express.static('.')); 
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 const SECRET = "my_social_secret_2026";
 
 // --- DYNAMIC EMAIL CONFIGURATION ---
 let transporter;
 
 async function setupEmail() {
-    // Try your current credentials first
     transporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',
         port: 587,
@@ -30,7 +38,6 @@ async function setupEmail() {
         }
     });
 
-    // Verify if they work, if not, create new ones automatically
     transporter.verify((error) => {
         if (error) {
             console.log("Email credentials expired. Generating fresh test account...");
@@ -43,10 +50,9 @@ async function setupEmail() {
                     auth: { user: account.user, pass: account.pass }
                 });
                 console.log(`NEW TEST EMAIL USER: ${account.user}`);
-                console.log(`VIEW EMAILS AT: https://ethereal.email/ (Login with above)`);
             });
         } else {
-            console.log("Email system ready with mabelle.beier@ethereal.email");
+            console.log("Email system ready");
         }
     });
 }
@@ -88,14 +94,12 @@ app.post('/send-invite', async (req, res) => {
             to: friendEmail,
             subject: 'Join LiteSocial!',
             html: `<h3>Hello!</h3><p>Jae has invited you.</p>
-                   <p><a href="http://127.0.0.1:5500/index.html">Click here to join!</a></p>`
+                   <p><a href="https://jae-social-network.onrender.com">Click here to join!</a></p>` // Updated Link
         };
 
         const info = await transporter.sendMail(mailOptions);
-        console.log("Invite Sent! Preview URL: %s", nodemailer.getTestMessageUrl(info));
         res.json({ message: "Invitation sent to " + friendEmail });
     } catch (e) { 
-        console.log("Invite Error:", e.message);
         res.status(401).json({ error: "Auth failed" }); 
     }
 });
@@ -124,4 +128,6 @@ app.get('/feed', (req, res) => {
     } catch (e) { res.status(401).json({ error: "Login required" }); }
 });
 
-server.listen(3000, () => console.log("Server running on http://localhost:3000"));
+// Render provides a PORT via environment variable, otherwise use 3000
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
