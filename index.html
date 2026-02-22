@@ -23,6 +23,7 @@
         .box { background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-top: 20px; width: 100%; box-sizing: border-box; }
         hr { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
         #status { font-size: 12px; color: #888; margin-bottom: 10px; }
+        h4 { margin-top: 0; color: #1c1e21; }
     </style>
 </head>
 <body>
@@ -31,13 +32,23 @@
 
     <div id="authSection" class="card">
         <h2>LiteSocial</h2>
-        <input id="regEmail" placeholder="Email Address">
-        <input id="regPass" type="password" placeholder="Password">
-        <button id="loginBtn" class="btn-green" onclick="login()">Login</button>
+        
+        <div class="box" style="margin-top:0">
+            <h4>Login</h4>
+            <input id="loginEmail" placeholder="Email Address">
+            <input id="loginPass" type="password" placeholder="Password">
+            <button id="loginBtn" class="btn-green" onclick="login()">Login</button>
+        </div>
+
         <hr>
-        <p style="text-align: center; color: #65676b;">New here? Create an account:</p>
-        <input id="regUser" placeholder="Username">
-        <button id="regBtn" class="btn-blue" onclick="register()">Join the Network</button>
+        
+        <div class="box">
+            <p style="text-align: center; color: #65676b; margin-top:0">New here? Create an account:</p>
+            <input id="regUser" placeholder="Username">
+            <input id="regEmail" placeholder="Email Address">
+            <input id="regPass" type="password" placeholder="Password">
+            <button id="regBtn" class="btn-blue" onclick="register()">Join the Network</button>
+        </div>
     </div>
 
     <div id="mainSection" class="card" style="display:none;">
@@ -69,7 +80,6 @@
     </div>
 
     <script>
-        // API Configuration
         const api = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
                     ? "http://localhost:3000" 
                     : window.location.origin;
@@ -86,13 +96,11 @@
             document.getElementById('status').style.color = "red";
         });
 
-        // UI Helpers
         function toggleStickers() {
             const tray = document.getElementById('stickerTray');
             tray.style.display = (tray.style.display === 'grid') ? 'none' : 'grid';
         }
 
-        // Invitation Logic
         async function sendInvite() {
             const email = document.getElementById('inviteEmail').value;
             const res = await fetch(`${api}/send-invite`, {
@@ -104,16 +112,20 @@
             alert(data.message || data.error);
         }
 
-        // Authentication Logic
         async function login() {
             const btn = document.getElementById('loginBtn');
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPass').value;
+
+            if(!email || !password) return alert("Please enter email and password");
+
             btn.disabled = true;
             btn.innerText = "Checking...";
             try {
                 const res = await fetch(`${api}/login`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ email: regEmail.value, password: regPass.value })
+                    body: JSON.stringify({ email, password })
                 });
                 const data = await res.json();
                 if(data.token) {
@@ -121,21 +133,29 @@
                     localStorage.setItem('username', data.username);
                     showMainSection(data.username);
                 } else { alert(data.error); }
-            } catch (e) { alert("Login failed. Check server connection."); }
+            } catch (e) { alert("Login failed."); }
             btn.disabled = false;
             btn.innerText = "Login";
         }
 
         async function register() {
             const btn = document.getElementById('regBtn');
+            const username = document.getElementById('regUser').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPass').value;
+
+            if(!username || !email || !password) return alert("Fill in all registration fields!");
+
             btn.disabled = true;
-            const res = await fetch(`${api}/register`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ username: regUser.value, email: regEmail.value, password: regPass.value })
-            });
-            const data = await res.json(); 
-            alert(data.message || data.error);
+            try {
+                const res = await fetch(`${api}/register`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ username, email, password })
+                });
+                const data = await res.json(); 
+                alert(data.message || data.error);
+            } catch (e) { alert("Registration failed."); }
             btn.disabled = false;
         }
 
@@ -147,7 +167,6 @@
             loadFeed(); loadUsers();
         }
 
-        // Posting Logic
         async function sendPost() {
             if(!postText.value.trim()) return;
             await fetch(`${api}/post`, {
@@ -167,7 +186,6 @@
             toggleStickers();
         }
 
-        // Data Loading
         async function loadFeed() {
             const token = localStorage.getItem('token');
             if(!token) return;
@@ -195,7 +213,6 @@
         
         socket.on('new-post', loadFeed);
 
-        // Session Persistence
         if (localStorage.getItem('token')) showMainSection(localStorage.getItem('username'));
     </script>
 </body>
