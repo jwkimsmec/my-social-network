@@ -103,10 +103,18 @@
 
         async function sendInvite() {
             const email = document.getElementById('inviteEmail').value;
+            const token = localStorage.getItem('token'); // Get the token
+
+            if(!email) return alert("Please enter a friend's email.");
+            if(!token) return alert("Session expired. Please login again.");
+
             const res = await fetch(`${api}/send-invite`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ token: localStorage.getItem('token'), friendEmail: email })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token // Pass the token in headers
+                },
+                body: JSON.stringify({ friendEmail: email })
             });
             const data = await res.json();
             alert(data.message || data.error);
