@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const db = require('./database');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
-const path = require('path'); // Added for handling file paths
+const path = require('path'); 
 
 const app = express();
 const server = http.createServer(app);
@@ -14,49 +14,20 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(cors());
 app.use(express.json());
-
-// --- NEW: SERVE FRONTEND FILES ---
-// This tells Express to serve index.html and other files from your folder
-app.use(express.static('.')); 
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+app.use(express.static(path.join(__dirname, '.')));
 
 const SECRET = "my_social_secret_2026";
 
-// --- DYNAMIC EMAIL CONFIGURATION ---
-let transporter;
-
-async function setupEmail() {
-    transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        auth: {
-            user: 'mabelle.beier@ethereal.email', 
-            pass: '6mBvKzB1D4U8v1Yp6r'         
-        }
-    });
-
-    transporter.verify((error) => {
-        if (error) {
-            console.log("Email credentials expired. Generating fresh test account...");
-            nodemailer.createTestAccount((err, account) => {
-                if (err) return console.error("Failed to create test account", err);
-                transporter = nodemailer.createTransport({
-                    host: account.smtp.host,
-                    port: account.smtp.port,
-                    secure: account.smtp.secure,
-                    auth: { user: account.user, pass: account.pass }
-                });
-                console.log(`NEW TEST EMAIL USER: ${account.user}`);
-            });
-        } else {
-            console.log("Email system ready");
-        }
-    });
-}
-setupEmail();
+// --- UPDATED EMAIL CONFIGURATION ---
+// Replace the user/pass with your Gmail + App Password if you want real emails
+const transporter = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    auth: {
+        user: 'mabelle.beier@ethereal.email', 
+        pass: '6mBvKzB1D4U8v1Yp6r'         
+    }
+});
 
 // --- AUTHENTICATION ---
 app.post('/register', async (req, res) => {
@@ -82,25 +53,31 @@ app.post('/login', (req, res) => {
     });
 });
 
-// --- INVITATION SYSTEM ---
+// --- UPDATED INVITATION SYSTEM ---
 app.post('/send-invite', async (req, res) => {
-    const { token, friendEmail } = req.body;
+    // Look for token in either body (from your sendInvite fix) or headers
+    const token = req.body.token || req.headers['authorization'];
+    const { friendEmail } = req.body;
+
+    if (!token) return res.status(401).json({ error: "No token provided" });
+
     try {
-        const user = jwt.verify(token, SECRET);
-        if (user.username !== 'Jae') return res.status(403).json({ error: "Only Jae can invite" });
+        const decoded = jwt.verify(token, SECRET);
+        if (decoded.username !== 'Jae') return res.status(403).json({ error: "Only Jae can invite" });
 
         const mailOptions = {
             from: '"LiteSocial" <noreply@litesocial.com>',
             to: friendEmail,
             subject: 'Join LiteSocial!',
             html: `<h3>Hello!</h3><p>Jae has invited you.</p>
-                   <p><a href="https://jae-social-network.onrender.com">Click here to join!</a></p>` // Updated Link
+                   <p><a href="https://jae-social-network.onrender.com">Click here to join!</a></p>`
         };
 
-        const info = await transporter.sendMail(mailOptions);
+        await transporter.sendMail(mailOptions);
         res.json({ message: "Invitation sent to " + friendEmail });
     } catch (e) { 
-        res.status(401).json({ error: "Auth failed" }); 
+        console.error("Invite Error:", e.message);
+        res.status(401).json({ error: "Auth failed: " + e.message }); 
     }
 });
 
@@ -128,6 +105,9 @@ app.get('/feed', (req, res) => {
     } catch (e) { res.status(401).json({ error: "Login required" }); }
 });
 
-// Render provides a PORT via environment variable, otherwise use 3000
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
