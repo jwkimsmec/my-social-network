@@ -4,22 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LiteSocial - 2026 Edition</title>
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 500px; margin-bottom: 20px; box-sizing: border-box; }
         input, textarea { width: 100%; margin-bottom: 10px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
         button { cursor: pointer; border: none; padding: 12px; border-radius: 6px; font-weight: bold; width: 100%; transition: opacity 0.2s; }
         button:hover { opacity: 0.8; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
         .btn-blue { background: #1877f2; color: white; }
         .btn-green { background: #42b72a; color: white; }
         .btn-red { background: #f02849; color: white; margin-top: 10px; }
         .sticker-tray { display: none; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 10px; background: #fff; border: 1px solid #ddd; margin-bottom: 10px; border-radius: 8px; }
         .sticker-item { font-size: 30px; cursor: pointer; text-align: center; border-radius: 4px; }
         .sticker-item:hover { background: #f0f2f5; }
-        .post-card { background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-top: 10px; word-wrap: break-word; }
+        .post-card { background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-top: 10px; word-wrap: break-word; text-align: left; width: 100%; }
         .post-user { color: #1877f2; font-weight: bold; margin-bottom: 5px; display: block; }
-        .box { background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-top: 20px; }
+        .box { background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-top: 20px; width: 100%; box-sizing: border-box; }
         hr { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
         #status { font-size: 12px; color: #888; margin-bottom: 10px; }
     </style>
@@ -32,11 +33,11 @@
         <h2>LiteSocial</h2>
         <input id="regEmail" placeholder="Email Address">
         <input id="regPass" type="password" placeholder="Password">
-        <button class="btn-green" onclick="login()">Login</button>
+        <button id="loginBtn" class="btn-green" onclick="login()">Login</button>
         <hr>
         <p style="text-align: center; color: #65676b;">New here? Create an account:</p>
         <input id="regUser" placeholder="Username">
-        <button class="btn-blue" onclick="register()">Join the Network</button>
+        <button id="regBtn" class="btn-blue" onclick="register()">Join the Network</button>
     </div>
 
     <div id="mainSection" class="card" style="display:none;">
@@ -68,8 +69,7 @@
     </div>
 
     <script>
-        // SMART API DETECTION
-        // If the URL contains "render", it uses your cloud link. Otherwise, it uses localhost.
+        // API Configuration
         const api = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
                     ? "http://localhost:3000" 
                     : window.location.origin;
@@ -86,22 +86,13 @@
             document.getElementById('status').style.color = "red";
         });
 
-        // STICKER LOGIC
+        // UI Helpers
         function toggleStickers() {
             const tray = document.getElementById('stickerTray');
             tray.style.display = (tray.style.display === 'grid') ? 'none' : 'grid';
         }
 
-        async function sendSticker(emoji) {
-            await fetch(`${api}/post`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ token: localStorage.getItem('token'), content: emoji })
-            });
-            toggleStickers();
-        }
-
-        // INVITE LOGIC
+        // Invitation Logic
         async function sendInvite() {
             const email = document.getElementById('inviteEmail').value;
             const res = await fetch(`${api}/send-invite`, {
@@ -113,22 +104,31 @@
             alert(data.message || data.error);
         }
 
-        // AUTH LOGIC
+        // Authentication Logic
         async function login() {
-            const res = await fetch(`${api}/login`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ email: regEmail.value, password: regPass.value })
-            });
-            const data = await res.json();
-            if(data.token) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('username', data.username);
-                showMainSection(data.username);
-            } else { alert(data.error); }
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.innerText = "Checking...";
+            try {
+                const res = await fetch(`${api}/login`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email: regEmail.value, password: regPass.value })
+                });
+                const data = await res.json();
+                if(data.token) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('username', data.username);
+                    showMainSection(data.username);
+                } else { alert(data.error); }
+            } catch (e) { alert("Login failed. Check server connection."); }
+            btn.disabled = false;
+            btn.innerText = "Login";
         }
 
         async function register() {
+            const btn = document.getElementById('regBtn');
+            btn.disabled = true;
             const res = await fetch(`${api}/register`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -136,6 +136,7 @@
             });
             const data = await res.json(); 
             alert(data.message || data.error);
+            btn.disabled = false;
         }
 
         function showMainSection(username) {
@@ -146,6 +147,7 @@
             loadFeed(); loadUsers();
         }
 
+        // Posting Logic
         async function sendPost() {
             if(!postText.value.trim()) return;
             await fetch(`${api}/post`, {
@@ -156,6 +158,16 @@
             postText.value = "";
         }
 
+        async function sendSticker(emoji) {
+            await fetch(`${api}/post`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ token: localStorage.getItem('token'), content: emoji })
+            });
+            toggleStickers();
+        }
+
+        // Data Loading
         async function loadFeed() {
             const token = localStorage.getItem('token');
             if(!token) return;
@@ -183,6 +195,7 @@
         
         socket.on('new-post', loadFeed);
 
+        // Session Persistence
         if (localStorage.getItem('token')) showMainSection(localStorage.getItem('username'));
     </script>
 </body>
