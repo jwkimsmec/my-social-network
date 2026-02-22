@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiteSocial - 2026 Edition</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 500px; margin-bottom: 20px; box-sizing: border-box; }
+        input, textarea { width: 100%; margin-bottom: 10px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        button { cursor: pointer; border: none; padding: 12px; border-radius: 6px; font-weight: bold; width: 100%; transition: opacity 0.2s; }
+        button:hover { opacity: 0.8; }
+        .btn-blue { background: #1877f2; color: white; }
+        .btn-green { background: #42b72a; color: white; }
+        .btn-red { background: #f02849; color: white; margin-top: 10px; }
+        .sticker-tray { display: none; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 10px; background: #fff; border: 1px solid #ddd; margin-bottom: 10px; border-radius: 8px; }
+        .sticker-item { font-size: 30px; cursor: pointer; text-align: center; border-radius: 4px; }
+        .sticker-item:hover { background: #f0f2f5; }
+        .post-card { background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-top: 10px; word-wrap: break-word; }
+        .post-user { color: #1877f2; font-weight: bold; margin-bottom: 5px; display: block; }
+        .box { background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-top: 20px; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
+        #status { font-size: 12px; color: #888; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="status">Connecting to server...</div>
+
+    <div id="authSection" class="card">
+        <h2>LiteSocial</h2>
+        <input id="regEmail" placeholder="Email Address">
+        <input id="regPass" type="password" placeholder="Password">
+        <button class="btn-green" onclick="login()">Login</button>
+        <hr>
+        <p style="text-align: center; color: #65676b;">New here? Create an account:</p>
+        <input id="regUser" placeholder="Username">
+        <button class="btn-blue" onclick="register()">Join the Network</button>
+    </div>
+
+    <div id="mainSection" class="card" style="display:none;">
+        <h3 id="welcome">Welcome!</h3>
+        
+        <div id="adminInviteBox" class="box" style="display:none; border: 2px solid #1877f2;">
+            <h4>👑 Jae's Admin Tools</h4>
+            <input id="inviteEmail" placeholder="Friend's Email">
+            <button class="btn-blue" onclick="sendInvite()">Send Invitation Email</button>
+        </div>
+
+        <textarea id="postText" rows="3" placeholder="What's on your mind?"></textarea>
+        <div style="display:flex; gap:5px; margin-bottom: 10px;">
+            <button class="btn-blue" onclick="sendPost()">Post to Wall</button>
+            <button style="width:60px; background: #e4e6eb;" onclick="toggleStickers()">🖼️</button>
+        </div>
+
+        <div id="stickerTray" class="sticker-tray">
+            <div class="sticker-item" onclick="sendSticker('😊')">😊</div>
+            <div class="sticker-item" onclick="sendSticker('🔥')">🔥</div>
+            <div class="sticker-item" onclick="sendSticker('❤️')">❤️</div>
+            <div class="sticker-item" onclick="sendSticker('🚀')">🚀</div>
+            <div class="sticker-item" onclick="sendSticker('🎉')">🎉</div>
+        </div>
+
+        <div id="feed"></div>
+        <div class="box"><h4>Who to Follow</h4><div id="userList"></div></div>
+        <button class="btn-red" onclick="logout()">Logout</button>
+    </div>
+
+    <script>
+        // SMART API DETECTION
+        // If the URL contains "render", it uses your cloud link. Otherwise, it uses localhost.
+        const api = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
+                    ? "http://localhost:3000" 
+                    : window.location.origin;
+
+        const socket = io(api);
+
+        socket.on('connect', () => {
+            document.getElementById('status').innerText = "● Server Connected";
+            document.getElementById('status').style.color = "green";
+        });
+
+        socket.on('disconnect', () => {
+            document.getElementById('status').innerText = "○ Server Offline";
+            document.getElementById('status').style.color = "red";
+        });
+
+        // STICKER LOGIC
+        function toggleStickers() {
+            const tray = document.getElementById('stickerTray');
+            tray.style.display = (tray.style.display === 'grid') ? 'none' : 'grid';
+        }
+
+        async function sendSticker(emoji) {
+            await fetch(`${api}/post`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ token: localStorage.getItem('token'), content: emoji })
+            });
+            toggleStickers();
+        }
+
+        // INVITE LOGIC
+        async function sendInvite() {
+            const email = document.getElementById('inviteEmail').value;
+            const res = await fetch(`${api}/send-invite`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ token: localStorage.getItem('token'), friendEmail: email })
+            });
+            const data = await res.json();
+            alert(data.message || data.error);
+        }
+
+        // AUTH LOGIC
+        async function login() {
+            const res = await fetch(`${api}/login`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ email: regEmail.value, password: regPass.value })
+            });
+            const data = await res.json();
+            if(data.token) {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('username', data.username);
+                showMainSection(data.username);
+            } else { alert(data.error); }
+        }
+
+        async function register() {
+            const res = await fetch(`${api}/register`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username: regUser.value, email: regEmail.value, password: regPass.value })
+            });
+            const data = await res.json(); 
+            alert(data.message || data.error);
+        }
+
+        function showMainSection(username) {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('mainSection').style.display = 'block';
+            document.getElementById('welcome').innerText = "Hello, " + username;
+            document.getElementById('adminInviteBox').style.display = (username === "Jae") ? "block" : "none";
+            loadFeed(); loadUsers();
+        }
+
+        async function sendPost() {
+            if(!postText.value.trim()) return;
+            await fetch(`${api}/post`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ token: localStorage.getItem('token'), content: postText.value })
+            });
+            postText.value = "";
+        }
+
+        async function loadFeed() {
+            const token = localStorage.getItem('token');
+            if(!token) return;
+            const res = await fetch(`${api}/feed`, { headers: { 'Authorization': token } });
+            const posts = await res.json();
+            document.getElementById('feed').innerHTML = posts.map(p => `
+                <div class="post-card">
+                    <span class="post-user">@${p.username}</span>
+                    <div>${p.content}</div>
+                </div>
+            `).join('');
+        }
+
+        async function loadUsers() {
+            const res = await fetch(`${api}/users`);
+            const users = await res.json();
+            const me = localStorage.getItem('username');
+            document.getElementById('userList').innerHTML = users
+                .filter(u => u.username !== me)
+                .map(u => `<div style="padding:8px 0; border-bottom:1px solid #eee;">@${u.username}</div>`)
+                .join('');
+        }
+
+        function logout() { localStorage.clear(); location.reload(); }
+        
+        socket.on('new-post', loadFeed);
+
+        if (localStorage.getItem('token')) showMainSection(localStorage.getItem('username'));
+    </script>
+</body>
+</html>

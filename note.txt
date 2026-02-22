@@ -1,0 +1,12 @@
+file:///C:/codes/my-social-network/index.html
+
+sqlite3 social.db
+
+sqlite> .table
+comments   followers  likes      posts      users
+
+sqlite> .headers on
+sqlite> .mode column
+
+sqlite> SELECT * FROM users;
+sqlite> .exit
