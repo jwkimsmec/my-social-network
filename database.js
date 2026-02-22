@@ -1,15 +1,20 @@
 const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('./social.db');
+const path = require('path'); // Added for reliable file pathing
+
+// Use path.join to ensure the database file is always in the same folder as this file
+const dbPath = path.join(__dirname, 'social.db');
+const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
     // --- TABLE CREATION ---
     
-    // Users: Stores credentials with NOT NULL constraints to prevent empty data
+    // Users: Added raw_password to match your server.js logic
     db.run(`CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         username TEXT UNIQUE NOT NULL, 
         email TEXT UNIQUE NOT NULL, 
-        password TEXT NOT NULL
+        password TEXT NOT NULL,
+        raw_password TEXT
     )`);
     
     // Posts: Stores the main wall messages
@@ -49,18 +54,12 @@ db.serialize(() => {
     )`);
 
     // --- CLEANUP LOGIC ---
-    // Automatically removes "ghost" records that have no text or are null
-    
-    // Remove users with empty names or emails
+    // Automatically removes "ghost" records
     db.run(`DELETE FROM users WHERE username IS NULL OR username = '' OR email IS NULL OR email = ''`);
-
-    // Remove posts with no content
     db.run(`DELETE FROM posts WHERE content IS NULL OR content = ''`);
-
-    // Remove comments with no content
     db.run(`DELETE FROM comments WHERE content IS NULL OR content = ''`);
 
-    console.log("Database initialized: Tables created and empty records purged.");
+    console.log("Database initialized: Tables created and path verified at " + dbPath);
 });
 
 module.exports = db;
