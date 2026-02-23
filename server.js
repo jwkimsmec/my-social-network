@@ -18,14 +18,12 @@ app.use(express.static(path.join(__dirname, '.')));
 
 const SECRET = "my_social_secret_2026";
 
-// --- UPDATED EMAIL CONFIGURATION ---
-// Replace the user/pass with your Gmail + App Password if you want real emails
+// --- FINAL GMAIL CONFIGURATION ---
 const transporter = nodemailer.createTransport({
-    host: 'smtp.ethereal.email',
-    port: 587,
+    service: 'gmail',
     auth: {
-        user: 'mabelle.beier@ethereal.email', 
-        pass: '6mBvKzB1D4U8v1Yp6r'         
+        user: 'YOUR_GMAIL@gmail.com', // Put your email here
+        pass: process.env.EMAIL_PASS   // This keeps your password secret!
     }
 });
 
