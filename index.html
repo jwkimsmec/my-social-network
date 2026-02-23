@@ -93,7 +93,11 @@
             document.getElementById('status').style.color = "green";
         });
 
-        // INVITATION LOGIC
+        socket.on('disconnect', () => {
+            document.getElementById('status').innerText = "○ Server Offline";
+            document.getElementById('status').style.color = "red";
+        });
+
         function generateInvite() {
             const link = window.location.origin;
             document.getElementById('linkUrl').innerText = link;
@@ -171,6 +175,7 @@
 
         async function loadFeed() {
             const token = localStorage.getItem('token');
+            if(!token) return;
             const res = await fetch(`${api}/feed`, { headers: { 'Authorization': token } });
             const posts = await res.json();
             document.getElementById('feed').innerHTML = posts.map(p => `
@@ -187,4 +192,17 @@
             const me = localStorage.getItem('username');
             document.getElementById('userList').innerHTML = users
                 .filter(u => u.username !== me)
-                .map
+                .map(u => `<div style="padding:8px 0; border-bottom:1px solid #eee;">@${u.username}</div>`)
+                .join('');
+        }
+
+        function logout() { localStorage.clear(); location.reload(); }
+        
+        socket.on('new-post', loadFeed);
+
+        if (localStorage.getItem('token')) {
+            showMainSection(localStorage.getItem('username'));
+        }
+    </script>
+</body>
+</html>
