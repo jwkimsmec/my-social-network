@@ -24,6 +24,7 @@
         hr { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
         #status { font-size: 12px; color: #888; margin-bottom: 10px; }
         h4 { margin-top: 0; color: #1c1e21; }
+        #inviteLinkDisplay { display: none; margin-top: 10px; padding: 10px; background: #e7f3ff; border-radius: 6px; border: 1px dashed #1877f2; }
     </style>
 </head>
 <body>
@@ -32,16 +33,13 @@
 
     <div id="authSection" class="card">
         <h2>LiteSocial</h2>
-        
         <div class="box" style="margin-top:0">
             <h4>Login</h4>
             <input id="loginEmail" placeholder="Email Address">
             <input id="loginPass" type="password" placeholder="Password">
             <button id="loginBtn" class="btn-green" onclick="login()">Login</button>
         </div>
-
         <hr>
-        
         <div class="box">
             <p style="text-align: center; color: #65676b; margin-top:0">New here? Create an account:</p>
             <input id="regUser" placeholder="Username">
@@ -56,8 +54,12 @@
         
         <div id="adminInviteBox" class="box" style="display:none; border: 2px solid #1877f2;">
             <h4>👑 Jae's Admin Tools</h4>
-            <input id="inviteEmail" placeholder="Friend's Email">
-            <button class="btn-blue" onclick="sendInvite()">Send Invitation Email</button>
+            <p style="font-size: 13px; margin-bottom: 10px;">Copy this link to invite your friends:</p>
+            <button class="btn-blue" onclick="generateInvite()">Generate Invite Link</button>
+            <div id="inviteLinkDisplay">
+                <code id="linkUrl" style="word-break: break-all; font-weight: bold;"></code>
+                <button class="btn-green" style="margin-top:8px; padding: 5px;" onclick="copyLink()">Copy to Clipboard</button>
+            </div>
         </div>
 
         <textarea id="postText" rows="3" placeholder="What's on your mind?"></textarea>
@@ -91,80 +93,52 @@
             document.getElementById('status').style.color = "green";
         });
 
-        socket.on('disconnect', () => {
-            document.getElementById('status').innerText = "○ Server Offline";
-            document.getElementById('status').style.color = "red";
-        });
+        // INVITATION LOGIC
+        function generateInvite() {
+            const link = window.location.origin;
+            document.getElementById('linkUrl').innerText = link;
+            document.getElementById('inviteLinkDisplay').style.display = 'block';
+        }
+
+        function copyLink() {
+            const text = document.getElementById('linkUrl').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Link copied! Paste it to your friends.");
+            });
+        }
 
         function toggleStickers() {
             const tray = document.getElementById('stickerTray');
             tray.style.display = (tray.style.display === 'grid') ? 'none' : 'grid';
         }
 
-        async function sendInvite() {
-            const email = document.getElementById('inviteEmail').value;
-            const token = localStorage.getItem('token'); // Get the token
-
-            if(!email) return alert("Please enter a friend's email.");
-            if(!token) return alert("Session expired. Please login again.");
-
-            const res = await fetch(`${api}/send-invite`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': token // Pass the token in headers
-                },
-                body: JSON.stringify({ friendEmail: email })
-            });
-            const data = await res.json();
-            alert(data.message || data.error);
-        }
-
         async function login() {
-            const btn = document.getElementById('loginBtn');
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPass').value;
-
-            if(!email || !password) return alert("Please enter email and password");
-
-            btn.disabled = true;
-            btn.innerText = "Checking...";
-            try {
-                const res = await fetch(`${api}/login`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ email, password })
-                });
-                const data = await res.json();
-                if(data.token) {
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('username', data.username);
-                    showMainSection(data.username);
-                } else { alert(data.error); }
-            } catch (e) { alert("Login failed."); }
-            btn.disabled = false;
-            btn.innerText = "Login";
+            const res = await fetch(`${api}/login`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if(data.token) {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('username', data.username);
+                showMainSection(data.username);
+            } else { alert(data.error); }
         }
 
         async function register() {
-            const btn = document.getElementById('regBtn');
             const username = document.getElementById('regUser').value;
             const email = document.getElementById('regEmail').value;
             const password = document.getElementById('regPass').value;
-
-            if(!username || !email || !password) return alert("Fill in all registration fields!");
-
-            btn.disabled = true;
-            try {
-                const res = await fetch(`${api}/register`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ username, email, password })
-                });
-                const data = await res.json(); 
-                alert(data.message || data.error);
-            } catch (e) { alert("Registration failed."); }
-            btn.disabled = false;
+            const res = await fetch(`${api}/register`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username, email, password })
+            });
+            const data = await res.json();
+            alert(data.message || data.error);
         }
 
         function showMainSection(username) {
@@ -176,13 +150,14 @@
         }
 
         async function sendPost() {
-            if(!postText.value.trim()) return;
+            const content = document.getElementById('postText').value;
+            if(!content.trim()) return;
             await fetch(`${api}/post`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ token: localStorage.getItem('token'), content: postText.value })
+                body: JSON.stringify({ token: localStorage.getItem('token'), content })
             });
-            postText.value = "";
+            document.getElementById('postText').value = "";
         }
 
         async function sendSticker(emoji) {
@@ -196,7 +171,6 @@
 
         async function loadFeed() {
             const token = localStorage.getItem('token');
-            if(!token) return;
             const res = await fetch(`${api}/feed`, { headers: { 'Authorization': token } });
             const posts = await res.json();
             document.getElementById('feed').innerHTML = posts.map(p => `
@@ -213,15 +187,4 @@
             const me = localStorage.getItem('username');
             document.getElementById('userList').innerHTML = users
                 .filter(u => u.username !== me)
-                .map(u => `<div style="padding:8px 0; border-bottom:1px solid #eee;">@${u.username}</div>`)
-                .join('');
-        }
-
-        function logout() { localStorage.clear(); location.reload(); }
-        
-        socket.on('new-post', loadFeed);
-
-        if (localStorage.getItem('token')) showMainSection(localStorage.getItem('username'));
-    </script>
-</body>
-</html>
+                .map
