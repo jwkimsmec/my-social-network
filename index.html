@@ -82,9 +82,10 @@
     </div>
 
     <script>
+        // Force API path to Render live URL
         const api = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
                     ? "http://localhost:3000" 
-                    : window.location.origin;
+                    : "https://jae-social-network.onrender.com";
 
         const socket = io(api);
 
@@ -96,6 +97,12 @@
         socket.on('disconnect', () => {
             document.getElementById('status').innerText = "○ Server Offline";
             document.getElementById('status').style.color = "red";
+        });
+
+        // REFRESH FEED ON NEW POST
+        socket.on('new-post', () => {
+            console.log("Socket: New post received!");
+            loadFeed();
         });
 
         function generateInvite() {
@@ -119,17 +126,19 @@
         async function login() {
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPass').value;
-            const res = await fetch(`${api}/login`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ email, password })
-            });
-            const data = await res.json();
-            if(data.token) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('username', data.username);
-                showMainSection(data.username);
-            } else { alert(data.error); }
+            try {
+                const res = await fetch(`${api}/login`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if(data.token) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('username', data.username);
+                    showMainSection(data.username);
+                } else { alert(data.error); }
+            } catch (e) { alert("Login failed. Check server connection."); }
         }
 
         async function register() {
@@ -150,25 +159,39 @@
             document.getElementById('mainSection').style.display = 'block';
             document.getElementById('welcome').innerText = "Hello, " + username;
             document.getElementById('adminInviteBox').style.display = (username === "Jae") ? "block" : "none";
-            loadFeed(); loadUsers();
+            loadFeed(); 
+            loadUsers();
         }
 
         async function sendPost() {
-            const content = document.getElementById('postText').value;
-            if(!content.trim()) return;
-            await fetch(`${api}/post`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ token: localStorage.getItem('token'), content })
-            });
-            document.getElementById('postText').value = "";
+            const postInput = document.getElementById('postText');
+            const content = postInput.value.trim();
+            const token = localStorage.getItem('token');
+
+            if(!content) return;
+            if(!token) return alert("Log in again.");
+
+            try {
+                const res = await fetch(`${api}/post`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ token: token, content: content })
+                });
+                if(res.ok) {
+                    postInput.value = "";
+                } else {
+                    const err = await res.json();
+                    alert(err.error);
+                }
+            } catch (e) { alert("Server error while posting."); }
         }
 
         async function sendSticker(emoji) {
+            const token = localStorage.getItem('token');
             await fetch(`${api}/post`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ token: localStorage.getItem('token'), content: emoji })
+                body: JSON.stringify({ token: token, content: emoji })
             });
             toggleStickers();
         }
@@ -176,29 +199,31 @@
         async function loadFeed() {
             const token = localStorage.getItem('token');
             if(!token) return;
-            const res = await fetch(`${api}/feed`, { headers: { 'Authorization': token } });
-            const posts = await res.json();
-            document.getElementById('feed').innerHTML = posts.map(p => `
-                <div class="post-card">
-                    <span class="post-user">@${p.username}</span>
-                    <div>${p.content}</div>
-                </div>
-            `).join('');
+            try {
+                const res = await fetch(`${api}/feed`, { headers: { 'Authorization': token } });
+                const posts = await res.json();
+                document.getElementById('feed').innerHTML = posts.map(p => `
+                    <div class="post-card">
+                        <span class="post-user">@${p.username}</span>
+                        <div>${p.content}</div>
+                    </div>
+                `).join('');
+            } catch (e) { console.error("Feed failed to load"); }
         }
 
         async function loadUsers() {
-            const res = await fetch(`${api}/users`);
-            const users = await res.json();
-            const me = localStorage.getItem('username');
-            document.getElementById('userList').innerHTML = users
-                .filter(u => u.username !== me)
-                .map(u => `<div style="padding:8px 0; border-bottom:1px solid #eee;">@${u.username}</div>`)
-                .join('');
+            try {
+                const res = await fetch(`${api}/users`);
+                const users = await res.json();
+                const me = localStorage.getItem('username');
+                document.getElementById('userList').innerHTML = users
+                    .filter(u => u.username !== me)
+                    .map(u => `<div style="padding:8px 0; border-bottom:1px solid #eee;">@${u.username}</div>`)
+                    .join('');
+            } catch (e) { console.error("User list failed"); }
         }
 
         function logout() { localStorage.clear(); location.reload(); }
-        
-        socket.on('new-post', loadFeed);
 
         if (localStorage.getItem('token')) {
             showMainSection(localStorage.getItem('username'));
